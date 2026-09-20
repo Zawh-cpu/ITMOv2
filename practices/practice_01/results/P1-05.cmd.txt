@@ -1,0 +1,24 @@
+# Самодостаточная команда запуска P1-05. Запускать из корня репозитория ITMOv2.
+# Ключ в файлы не записывается: перед запуском задайте его в окружении (пример вне репозитория):
+#   export VSELLM_API_KEY='<ваш ключ VseLLM>'
+# Конфигурация провайдера: practices/practice_01/results/provider.example.json (без ключа;
+# baseURL https://litellm.data-light.ru/, модель Claude Sonnet 5 Thinking (идентификатор в provider.example.json), ключ из {env:VSELLM_API_KEY}).
+# Корневой конфиг проекта не используется: в нём другая модель, поэтому запуск шёл через provider.example.json.
+# Фактически запуск шёл в такой же временной папке, ключ брался из локального файла вне репозитория (не хранится).
+# Критерий повторяемости: структура, тип рисков и выводы совпадают по смыслу; дословное совпадение
+# и точные числа (слова, строки) не требуются, ответы модели недетерминированны.
+# Master prompt v1.1 вырезается из prompts.md; копия: results/master_prompt_v1.1.md.
+# Команда вырезки (в practices/practice_01): awk '/^### 1. Цель и роль/{f=1} /^## Сравнение двух запусков/{f=0} f' prompts.md > master_prompt_v1.1.md
+REPO="$(pwd)"
+RUN_DIR="$(mktemp -d)"   # временная папка вне репозитория
+mkdir -p "$RUN_DIR"
+cp "$REPO/practices/practice_01/TRAINING_PR.diff" "$RUN_DIR/"
+cp "$REPO/practices/practice_01/results/master_prompt_v1.1.md" "$RUN_DIR/"
+cd "$RUN_DIR"
+export OPENCODE_CONFIG="$REPO/practices/practice_01/results/provider.example.json"
+export OPENCODE_CONFIG_CONTENT='{"permission":{"*":"deny"}}'
+[ -n "$VSELLM_API_KEY" ] || { echo "Задайте VSELLM_API_KEY"; exit 1; }
+timeout 240 opencode run --agent plan --model vsellm/anthropic/claude-sonnet-5 --format json --file TRAINING_PR.diff --file master_prompt_v1.1.md -- "Выполни инструкцию из master_prompt_v1.1.md для приложенного diff." > out.jsonl 2> err.txt
+# Первая попытка с этой же командой дошла до timeout 240 (rc=124, пустой вывод); результат — вторая попытка (rc=0, ~94 с).
+# Результат: $RUN_DIR/out.jsonl (сырой вывод). Ответ модели = склейка текстовых частей (type "text") из out.jsonl;
+# сохранён в P1-05.md, сырой вывод в P1-05.jsonl (в этой папке).
