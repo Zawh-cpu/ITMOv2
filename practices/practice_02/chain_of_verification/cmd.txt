@@ -1,0 +1,19 @@
+# Chain of Verification, три отдельных вызова Claude Sonnet 5 Thinking. Ключ в файлы не пишу: export VSELLM_API_KEY='<ключ VseLLM>'
+# Провайдер: practices/practice_01/results/provider.example.json (без ключа). Повторяемость по смыслу, дословно не совпадёт.
+# Текст запросов: step1_draft_questions.prompt.txt, step2_answers.prompt.txt, step3_final.prompt.txt (в этой папке).
+REPO="$(pwd)"; CD="$REPO/practices/practice_02/chain_of_verification"; P1="$REPO/practices/practice_01"
+export OPENCODE_CONFIG="$P1/results/provider.example.json"
+export OPENCODE_CONFIG_CONTENT='{"permission":{"*":"deny"}}'
+[ -n "$VSELLM_API_KEY" ] || { echo "Задайте VSELLM_API_KEY"; exit 1; }
+
+# Шаг 1: только tests_load.md (кода у модели нет) -> черновик C1-C12 и вопросы Q1-Q12
+D1=$(mktemp -d); cp "$CD/input_tests_load.md" "$D1/tests_load.md"; cd "$D1"
+timeout 240 opencode run --agent plan --model vsellm/anthropic/claude-sonnet-5 --format json --file tests_load.md -- "$(cat "$CD/step1_draft_questions.prompt.txt")" > out.jsonl 2> err.txt
+# Шаг 2: только вопросы (step2_questions.md, в запуске копия под именем questions.md; это раздел «Вопросы» из результата шага 1) и источники; черновика нет
+D2=$(mktemp -d); cp "$CD/step2_questions.md" "$D2/questions.md"; cp "$P1/TRAINING_PR.diff" "$P1/problem.md" "$P1/context.md" "$D2/"; cd "$D2"
+timeout 240 opencode run --agent plan --model vsellm/anthropic/claude-sonnet-5 --format json --file questions.md --file TRAINING_PR.diff --file problem.md --file context.md -- "$(cat "$CD/step2_answers.prompt.txt")" > out.jsonl 2> err.txt
+# Шаг 3: tests_load.md и склейка черновик+вопросы+ответы (step3_input_draft_and_answers.md); источников нет
+D3=$(mktemp -d); cp "$CD/input_tests_load.md" "$D3/tests_load.md"; cp "$CD/step3_input_draft_and_answers.md" "$D3/draft_and_answers.md"; cd "$D3"
+timeout 240 opencode run --agent plan --model vsellm/anthropic/claude-sonnet-5 --format json --file tests_load.md --file draft_and_answers.md -- "$(cat "$CD/step3_final.prompt.txt")" > out.jsonl 2> err.txt
+# Каждый шаг с первой попытки ушёл в timeout 240 (rc=124, вывода нет);
+# результат каждого шага - вторая попытка с той же командой (rc=0). stepN_*.jsonl = out.jsonl, stepN_*.md = склейка text-частей.

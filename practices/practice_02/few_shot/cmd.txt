@@ -1,0 +1,14 @@
+# Запускать из корня репозитория ITMOv2. Ключ в файлы не пишу: перед запуском задаю в окружении
+#   export VSELLM_API_KEY='<ключ VseLLM>'
+# Провайдер: practices/practice_01/results/provider.example.json (без ключа).
+# Повторяемость по смыслу: ответы недетерминированны, дословного совпадения не жду.
+REPO="$(pwd)"
+RUN_DIR="$(mktemp -d)"
+cp "$REPO/practices/practice_01/tests_load.md" "$REPO/practices/practice_01/TRAINING_PR.diff" "$REPO/practices/practice_02/few_shot/examples.md" "$RUN_DIR/"
+cd "$RUN_DIR"
+export OPENCODE_CONFIG="$REPO/practices/practice_01/results/provider.example.json"
+export OPENCODE_CONFIG_CONTENT='{"permission":{"*":"deny"}}'
+[ -n "$VSELLM_API_KEY" ] || { echo "Задайте VSELLM_API_KEY"; exit 1; }
+timeout 240 opencode run --agent plan --model vsellm/anthropic/claude-sonnet-5 --format json --file tests_load.md --file TRAINING_PR.diff --file examples.md -- "Перепиши tests_load.md для приложенного TRAINING_PR.diff. Оформи каждую проверку как хороший пример из examples.md и не делай как плохой пример. Числа, которых нет в diff, оставь допущениями. Верни готовое содержимое файла целиком." > out.jsonl 2> err.txt
+# Первая попытка дошла до timeout 240 (rc=124, вывод пустой). Результат - вторая попытка с той же командой (rc=0).
+# result.jsonl = out.jsonl; result.md = склейка text-частей (type "text", part.text).

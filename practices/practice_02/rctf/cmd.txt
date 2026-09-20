@@ -1,0 +1,13 @@
+# Запускать из корня репозитория ITMOv2. Ключ в файлы не пишу: export VSELLM_API_KEY='<ключ VseLLM>'
+# Запрос целиком лежит в practices/practice_02/rctf/prompt.txt.
+# Повторяемость по смыслу: ответы недетерминированны.
+REPO="$(pwd)"
+RUN_DIR="$(mktemp -d)"
+cp "$REPO/practices/practice_01/tests_load.md" "$REPO/practices/practice_01/problem.md" "$REPO/practices/practice_01/TRAINING_PR.diff" "$RUN_DIR/"
+cd "$RUN_DIR"
+export OPENCODE_CONFIG="$REPO/practices/practice_01/results/provider.example.json"
+export OPENCODE_CONFIG_CONTENT='{"permission":{"*":"deny"}}'
+[ -n "$VSELLM_API_KEY" ] || { echo "Задайте VSELLM_API_KEY"; exit 1; }
+timeout 240 opencode run --agent plan --model vsellm/anthropic/claude-sonnet-5 --format json --file tests_load.md --file problem.md --file TRAINING_PR.diff -- "$(cat "$REPO/practices/practice_02/rctf/prompt.txt")" > out.jsonl 2> err.txt
+# Запуск прошёл с первой попытки (rc=0). Входной tests_load.md - версия Практики 1 до правок Практики 2.
+# result.jsonl = out.jsonl; result.md = склейка text-частей.
