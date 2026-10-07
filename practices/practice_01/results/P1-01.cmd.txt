@@ -1,0 +1,22 @@
+# Самодостаточная команда запуска P1-01. Запускать из корня репозитория ITMOv2.
+# Ключ в файлы не записывается: перед запуском задайте его в окружении (пример вне репозитория):
+#   export VSELLM_API_KEY='<ваш ключ VseLLM>'
+# Конфигурация провайдера: practices/practice_01/results/provider.example.json (без ключа;
+# baseURL https://litellm.data-light.ru/, модель Claude Sonnet 5 Thinking (идентификатор в provider.example.json), ключ из {env:VSELLM_API_KEY}).
+# Корневой конфиг проекта не используется: в нём другая модель, поэтому запуск шёл через provider.example.json.
+# Фактически запуск шёл в такой же временной папке, ключ брался из локального файла вне репозитория (не хранится).
+# Критерий повторяемости: структура, тип рисков и выводы совпадают по смыслу; дословное совпадение
+# и точные числа (слова, строки) не требуются, ответы модели недетерминированны.
+# Запрос: zero-shot, без master prompt.
+REPO="$(pwd)"
+RUN_DIR="$(mktemp -d)"   # временная папка вне репозитория
+mkdir -p "$RUN_DIR"
+cp "$REPO/practices/practice_01/TRAINING_PR.diff" "$RUN_DIR/"
+
+cd "$RUN_DIR"
+export OPENCODE_CONFIG="$REPO/practices/practice_01/results/provider.example.json"
+export OPENCODE_CONFIG_CONTENT='{"permission":{"*":"deny"}}'
+[ -n "$VSELLM_API_KEY" ] || { echo "Задайте VSELLM_API_KEY"; exit 1; }
+timeout 240 opencode run --agent plan --model vsellm/anthropic/claude-sonnet-5 --format json --file TRAINING_PR.diff -- "Ниже diff учебного PR. Посмотри PR и найди проблемы." > out.jsonl 2> err.txt
+# Результат: $RUN_DIR/out.jsonl (сырой вывод). Ответ модели = склейка текстовых частей (type "text") из out.jsonl;
+# сохранён в P1-01.md, сырой вывод в P1-01.jsonl (в этой папке).
